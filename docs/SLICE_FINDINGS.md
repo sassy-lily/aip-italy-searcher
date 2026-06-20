@@ -48,13 +48,34 @@ Interfaces are identical → swapping to the torch-based locked models later is 
   table 2.18). Expected; the locked bge-reranker-v2-m3 may differ.
 - fastembed e5-large now uses mean pooling (a behaviour-change warning) — correct for e5.
 
+## Phase 2 (synthesis + guards) — findings
+Built `synth.py` (constrained-decoding JSON via Ollama `format=schema`, `think=False`),
+`guards.py` (citation + number integrity), and the `ask` CLI command. Tested live against
+**qwen3:4b on the Radeon 860M iGPU** (Vulkan; `OLLAMA_VULKAN=1` + `OLLAMA_IGPU_ENABLE=1`).
+- **Constrained JSON works**: bounded, structured output — no 1762-token ramble; claims +
+  citations + verbatim_values + gaps.
+- **Answers are correct & grounded**: "codice emergenza" → 7700/7600/7500 from ENR 1.6.2.4,
+  cited; "volo da diporto" → Legge 106/1985 Art. 1 & 2, cited with normattiva.it deep links.
+- **Number-integrity guard works** once scoped: it *passes* real data (squawk codes verified
+  present in source) and must *skip* reference numbers (law numbers, years, section ids) —
+  scanning all claim-text numbers initially false-flagged "106"/"1985". Fixed by excluding
+  years + cited-section reference numbers. Targets DATA, not citations.
+- **Latency**: ~1 min/query via the CLI, dominated by per-invocation model loading (fastembed
+  e5 + jina reload each process) + cold LLM load — a persistent service would be far faster.
+- Minor (left for tuning): model sometimes over-includes tangential chunks, occasionally
+  misfiles a citation ref into `verbatim_values` (guard strips it), and emits duplicate gaps.
+- iGPU generation ≈ 14 tok/s (memory-bandwidth-bound, ≈ CPU) but keeps the 16 CPU cores free
+  for the embedder/reranker — useful non-contention rather than raw speed.
+
 ## Not done (deliberately out of slice scope)
-- Docling table reconstruction; full router + gazetteer; LLM synthesis + integrity guards
-  (Phase 2, needs Ollama); empirical threshold calibration (placeholders in CLI);
-  conflicting-sources refinement (C); the production BGE-M3 / bge-reranker-v2-m3 models.
+- Docling table reconstruction; full router + gazetteer; empirical threshold calibration
+  (placeholders in CLI); conflicting-sources refinement (C); the production BGE-M3 /
+  bge-reranker-v2-m3 models; web UI; persistent-service latency.
 
 ## Run it
 ```bash
-uv run aip-search ingest                 # build the index (downloads models on first run)
-uv run aip-search query "Qual è la frequenza della torre di Crotone?"
+uv run aip-search ingest                                   # build the index (downloads models 1st run)
+uv run aip-search query "Qual è la frequenza della torre di Crotone?"   # retrieval only
+uv run aip-search ask "Che codice si seleziona sul transponder per un'emergenza?"  # synthesized + cited
 ```
+Requires Ollama running `qwen3:4b` (iGPU via Vulkan: `OLLAMA_VULKAN=1`, `OLLAMA_IGPU_ENABLE=1`).

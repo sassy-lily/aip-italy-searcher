@@ -24,3 +24,6 @@ SLICE_FILES = [
 # locked BGE-M3 / bge-reranker-v2-m3 (which need torch); interfaces are identical.
 DENSE_MODEL = "intfloat/multilingual-e5-large"
 RERANK_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
+
+# Generation LLM, served by Ollama (on the Radeon 860M iGPU via Vulkan).
+LLM_MODEL = "qwen3:4b"
