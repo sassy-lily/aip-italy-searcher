@@ -146,13 +146,18 @@ LLM-free router; gazetteer auto-derived from AD filenames (97 ICAOs, 160 name to
 ## Not done (deliberately out of slice scope)
 - Router extensions: airspace *entity* resolution (currently keyword-routed, not bound to a
   specific TMA/CTR), richer informal-alias coverage, foreign ICAO detection (only LI** parsed).
-- Docling table reconstruction; conflicting-sources refinement (C); web UI;
-  persistent-service latency; leaner CPU-only torch install.
+- Docling table reconstruction; conflicting-sources refinement (C);
+  persistent-service latency (Streamlit keeps models resident per session via
+  `@st.cache_resource`, so only the first query is slow — a standalone service is deferred);
+  leaner CPU-only torch install.
 
 ## Run it
 ```bash
-uv run aip-search ingest                                   # build the index (downloads models 1st run)
+uv run aip-search ingest --full                            # build the index (downloads models 1st run)
 uv run aip-search query "Qual è la frequenza della torre di Crotone?"   # retrieval only
 uv run aip-search ask "Che codice si seleziona sul transponder per un'emergenza?"  # synthesized + cited
+uv run streamlit run src/aip_search/streamlit_app.py       # web UI
 ```
 Requires Ollama running `qwen3:4b` (iGPU via Vulkan: `OLLAMA_VULKAN=1`, `OLLAMA_IGPU_ENABLE=1`).
+The CLI and the Streamlit UI share one pipeline (`answer.py`); the UI handles clarify via
+candidate buttons and keeps models resident per session (`@st.cache_resource`).
