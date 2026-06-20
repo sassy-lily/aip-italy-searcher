@@ -122,11 +122,21 @@ Retrieval validated at scale:
   improved quality.
 - `Retriever` loads 7,568 chunks + builds BM25 in ~0.5s.
 
+## Gazetteer router (router.py, ARCHITECTURE.md §8)
+LLM-free router; gazetteer auto-derived from AD filenames (97 ICAOs, 160 name tokens).
+`route(query)` → one of search / clarify / abstain, decided before any model loads:
+- **Resolve**: ICAO ("LIRF") or unambiguous name → hard entity filter. Set-intersection
+  narrows multi-token names ("Roma Fiumicino" → LIRF) while bare "Milano" stays ambiguous.
+- **Clarify**: ambiguous city → candidate list ("Milano" → LIMB/LIMC/LIML).
+- **Abstain**: foreign/unknown airport ("JFK", "Heathrow") or ICAO not in corpus — **closes
+  the false-positive gap the recalibration exposed**, at the router, before retrieval.
+- **Open**: airspace queries (TMA/CTR/FIR → entity-agnostic ENR, +airspace role) and general
+  questions. Airport-vs-airspace fork prevents wrongly disambiguating "TMA di Milano".
+- Clarify/abstain return in ~1s (no embedder/reranker/LLM load).
+
 ## Not done (deliberately out of slice scope)
-- **Full router + gazetteer** — entity detection is still an ICAO regex + tiny alias stub.
-  Two consequences proven during testing: "Milano"/city names won't disambiguate, and
-  *foreign*-airport queries ("JFK", "Heathrow") aren't recognized as unresolvable entities,
-  so they slip past the score gate. This is the highest-value remaining feature.
+- Router extensions: airspace *entity* resolution (currently keyword-routed, not bound to a
+  specific TMA/CTR), richer informal-alias coverage, foreign ICAO detection (only LI** parsed).
 - Docling table reconstruction; conflicting-sources refinement (C); web UI;
   persistent-service latency; leaner CPU-only torch install.
 

@@ -1,7 +1,7 @@
 """Retrieval engine: hybrid (dense ∪ BM25) → RRF → metadata gate → cross-encoder rerank.
 
-Slice scope: a light deterministic router stub (entity detect + role hints) feeds the
-gate. The full router (ARCHITECTURE.md §8) is a later thread.
+Routing (entity filter, target roles) is decided upstream by router.route(); search() just
+consumes the resulting filter and role hints.
 """
 from __future__ import annotations
 
@@ -15,54 +15,10 @@ from .config import BACKEND, RERANK_MODEL
 from .index import embed_query, open_table
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:\.[a-z0-9]+)*")
-_ICAO_RE = re.compile(r"\bLI[A-Z]{2}\b")
-
-# Slice stub for the gazetteer/alias layer (the real one is auto-derived at ingest).
-_ALIAS = {"crotone": "LIBC"}
-
-# Italian intent cues → roles/data-subtypes to soft-boost.
-_ROLE_CUES = {
-    "frequenz": ("data", "frequency"),
-    "freq": ("data", "frequency"),
-    "transponder": ("rule", None),
-    "ssr": ("rule", None),
-    "squawk": ("rule", None),
-    "codice": ("rule", None),
-    "come": ("procedure", None),
-    "procedura": ("procedure", None),
-    "cosa significa": ("definition", None),
-    "definizione": ("definition", None),
-    "limiti": ("airspace", None),
-    "spazio aereo": ("airspace", None),
-    "vietat": ("warning", None),
-    "proibit": ("warning", None),
-}
 
 
 def _tok(s: str) -> list[str]:
     return _TOKEN_RE.findall(s.lower())
-
-
-def detect_entity(query: str) -> str | None:
-    m = _ICAO_RE.search(query.upper())
-    if m:
-        return m.group(0)
-    low = query.lower()
-    for name, icao in _ALIAS.items():
-        if name in low:
-            return icao
-    return None
-
-
-def role_hints(query: str) -> tuple[set[str], set[str]]:
-    low = query.lower()
-    roles, subs = set(), set()
-    for cue, (role, sub) in _ROLE_CUES.items():
-        if cue in low:
-            roles.add(role)
-            if sub:
-                subs.add(sub)
-    return roles, subs
 
 
 @dataclass
@@ -77,7 +33,7 @@ def _reranker():
     if BACKEND == "torch":
         from sentence_transformers import CrossEncoder
 
-        return ("ce", CrossEncoder(RERANK_MODEL))  # BAAI/bge-reranker-v2-m3
+        return ("ce", CrossEncoder(RERANK_MODEL))
     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
     return ("fe", TextCrossEncoder(model_name=RERANK_MODEL))
@@ -90,39 +46,38 @@ class Retriever:
         self.bm25 = BM25Okapi([_tok(r["text"]) for r in self.rows])
         self.by_id = {r["id"]: r for r in self.rows}
 
-    def search(self, query: str, k: int = 6, pool: int = 30, rerank_n: int = 15) -> list[Result]:
+    def search(self, query: str, entity_filter: set[str] | None = None,
+               roles: set[str] | None = None, subs: set[str] | None = None,
+               k: int = 6, pool: int = 30, rerank_n: int = 15) -> list[Result]:
+        roles, subs = roles or set(), subs or set()
+
         # ① hybrid candidate generation
         qvec = embed_query(query)
         dense = self.tbl.search(qvec).limit(pool).to_pandas().to_dict("records")
         dense_rank = {r["id"]: i for i, r in enumerate(dense)}
-
         scores = self.bm25.get_scores(_tok(query))
         sparse_ids = [self.rows[i]["id"] for i in scores.argsort()[::-1][:pool]]
         sparse_rank = {cid: i for i, cid in enumerate(sparse_ids)}
 
-        # RRF fusion
         k0 = 60
-        rrf: dict[str, float] = {}
-        for cid in set(dense_rank) | set(sparse_rank):
-            rrf[cid] = 1 / (k0 + dense_rank.get(cid, pool)) + 1 / (k0 + sparse_rank.get(cid, pool))
+        rrf = {cid: 1 / (k0 + dense_rank.get(cid, pool)) + 1 / (k0 + sparse_rank.get(cid, pool))
+               for cid in set(dense_rank) | set(sparse_rank)}
 
         # ② metadata gate
-        entity = detect_entity(query)
-        roles, subs = role_hints(query)
         gated: list[tuple[str, float]] = []
         for cid, base in rrf.items():
             r = self.by_id[cid]
-            if entity and not (r["entity"] == entity or r["entity_agnostic"]):
-                continue  # HARD entity filter (with entity-agnostic escape hatch)
+            if entity_filter and not (r["entity"] in entity_filter or r["entity_agnostic"]):
+                continue  # HARD entity filter (entity-agnostic escape hatch)
             if r["role"] == "reference":
-                continue  # HARD exclude scaffolding
+                continue
             s = base
             if r["role"] in roles:
-                s += 0.01  # SOFT role boost
+                s += 0.01
             if r["data_subtype"] and r["data_subtype"] in subs:
                 s += 0.01
             if r["data_subtype"] == "conversion-table":
-                s -= 0.02  # suppress the "7000-as-altitude" distractor
+                s -= 0.02
             gated.append((cid, s))
 
         gated.sort(key=lambda x: x[1], reverse=True)
@@ -138,4 +93,5 @@ class Retriever:
         else:
             rr = list(model.rerank(query, texts))
         ranked = sorted(zip(cand_ids, rr), key=lambda x: x[1], reverse=True)[:k]
-        return [Result(text=self.by_id[cid]["text"], rerank_score=float(s), meta=self.by_id[cid]) for cid, s in ranked]
+        return [Result(text=self.by_id[c]["text"], rerank_score=float(s), meta=self.by_id[c])
+                for c, s in ranked]

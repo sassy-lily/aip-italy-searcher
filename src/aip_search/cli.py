@@ -13,7 +13,8 @@ from rich.console import Console
 from .guards import verify
 from .index import build_index
 from .ingest import ingest_corpus
-from .retrieve import Result, Retriever, detect_entity
+from .retrieve import Result, Retriever
+from .router import Route, route
 from .synth import synthesize
 
 app = typer.Typer(add_completion=False, help="AIP-Search — local Italian AIP/VDS lookup (slice).")
@@ -46,14 +47,29 @@ def ingest(full: bool = typer.Option(False, "--full", help="Ingest the whole cor
             console.print(f"  · {name}: {err}")
 
 
+def _route_or_stop(rt: Route) -> bool:
+    """Render a clarify/abstain decision; return True if the caller should stop."""
+    if rt.kind == "abstain":
+        console.print(f"[red]{rt.message}[/red]")
+        return True
+    if rt.kind == "clarify":
+        console.print(f"[yellow]{rt.message}[/yellow]")
+        for ic, name in rt.candidates:
+            console.print(f"  • {ic} — {name}")
+        return True
+    return False
+
+
 @app.command()
 def query(question: str, k: int = 5) -> None:
     """Retrieve + rerank for an Italian question (sources only, no synthesis)."""
+    rt = route(question)
+    if _route_or_stop(rt):
+        return
+    if rt.entity_filter:
+        console.print(f"[dim]entity: {', '.join(sorted(rt.entity_filter))}[/dim]")
     r = Retriever()
-    res = r.search(question, k=k)
-    ent = detect_entity(question)
-    if ent:
-        console.print(f"[dim]entity resolved: {ent}[/dim]")
+    res = r.search(question, entity_filter=rt.entity_filter, roles=rt.roles, subs=rt.subs, k=k)
     if not res:
         console.print("[yellow]Nessun risultato pertinente.[/yellow]")
         return
@@ -90,8 +106,11 @@ def _print_sources(results: list[Result], label: str = "Fonti") -> None:
 @app.command()
 def ask(question: str, k: int = 5) -> None:
     """Answer an Italian question with a synthesized, cited response (Phase 2)."""
+    rt = route(question)
+    if _route_or_stop(rt):
+        return
     r = Retriever()
-    res = r.search(question, k=k)
+    res = r.search(question, entity_filter=rt.entity_filter, roles=rt.roles, subs=rt.subs, k=k)
     if not res:
         console.print("[red]Non ho trovato informazioni pertinenti.[/red]")
         return
