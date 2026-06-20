@@ -94,10 +94,31 @@ out-of-corpus) and reports top-reranker-score distributions. Result on the slice
   strong retrieval AND a committed, fully-verified answer — hedging is the safe default.
 - Re-run the script after any reranker or corpus change; the score scale is model-specific.
 
+## Full-corpus ingestion
+`aip-search ingest --full` walks the whole corpus. Result:
+- **7,568 chunks from 907 AIP + 8 VDS files, 0 parse failures**, ~1h49m (CPU embedding with
+  BGE-M3 dominates; one-time per AIRAC cycle).
+- AKN/PDF dedupe confirmed: 8 VDS (not 10) — the 2 legislation PDFs with Akoma Ntoso twins
+  were skipped in favor of the XML.
+- Role distribution: data=3863, rule=2083, airspace=706, warning=611, chart=206,
+  reference=78, definition=21 — corpus-shaped, no anomalies; deterministic tagging
+  generalized from 3 to 900 files cleanly.
+
+Retrieval validated at scale:
+- **Entity hard-filter isolates correctly**: "frequenza TWR di LIRF" → only Roma Fiumicino
+  chunks (AD 2.18 #1 at 0.97), out of ~100 airports. Crotone query → LIBC + the
+  entity-agnostic escape hatch as designed.
+- The original hard question ("codice transponder VFR non in contatto con l'ATC") now
+  retrieves the exact section **ENR 1.6.2.10 (Frequency Monitoring Codes)** at top — scale
+  improved quality.
+- `Retriever` loads 7,568 chunks + builds BM25 in ~0.5s.
+
 ## Not done (deliberately out of slice scope)
-- Docling table reconstruction; full router + gazetteer; empirical threshold calibration
-  (placeholders in CLI); conflicting-sources refinement (C); web UI; persistent-service
-  latency; leaner CPU-only torch install.
+- Docling table reconstruction; full router + gazetteer (entity detection is still an ICAO
+  regex + tiny alias stub — "Milano"/city names won't disambiguate yet); conflicting-sources
+  refinement (C); web UI; persistent-service latency; leaner CPU-only torch install.
+- Re-calibrate abstention thresholds on the full corpus (current values were derived on the
+  3-file slice).
 
 ## Run it
 ```bash

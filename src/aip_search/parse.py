@@ -97,6 +97,21 @@ def parse_pdf(path: str, default_section: str) -> list[RawChunk]:
     return [c for c in chunks if len(c.text) > 25]
 
 
+def parse_pdf_generic(path: str, section: str) -> list[RawChunk]:
+    """Parse a non-AIP PDF (legislation) into one chunk per page, keeping Italian text.
+
+    Legislation PDFs lack the AIP GEN/ENR/AD heading structure, so we don't try to split
+    on it — page-level chunks, size-split downstream.
+    """
+    doc = fitz.open(path)
+    out: list[RawChunk] = []
+    for pno in range(doc.page_count):
+        text = re.sub(r"[ \t]+", " ", "\n".join(_page_lines(doc[pno]))).strip()
+        if len(text) > 25:
+            out.append(RawChunk(section_code=f"{section} p.{pno + 1}", text=text, page=pno + 1))
+    return out
+
+
 # --- Akoma Ntoso ---------------------------------------------------------------
 
 _AKN_NS = {"akn": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
@@ -136,12 +151,5 @@ def parse_akn(path: str) -> tuple[list[RawChunk], dict]:
         text = _text_of(art)
         if len(text) < 20:
             continue
-        chunks.append(
-            RawChunk(
-                section_code=f"Legge 106/1985 {num}".strip(),
-                text=text,
-                page=1,
-                extra={"eid": eid},
-            )
-        )
+        chunks.append(RawChunk(section_code=num, text=text, page=1, extra={"eid": eid}))
     return chunks, meta

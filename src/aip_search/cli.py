@@ -5,12 +5,14 @@ once Ollama is installed.
 """
 from __future__ import annotations
 
+from collections import Counter
+
 import typer
 from rich.console import Console
 
 from .guards import verify
 from .index import build_index
-from .ingest import ingest_all
+from .ingest import ingest_corpus
 from .retrieve import Result, Retriever, detect_entity
 from .synth import synthesize
 
@@ -26,10 +28,20 @@ TAU_LOW = 0.45   # < → abstain; between → hedged
 
 
 @app.command()
-def ingest() -> None:
-    """Parse the slice files, role-tag, embed, and build the LanceDB index."""
-    n = build_index(ingest_all())
-    console.print(f"[green]Indexed {n} chunks.[/green]")
+def ingest(full: bool = typer.Option(False, "--full", help="Ingest the whole corpus (else 3-file slice).")) -> None:
+    """Parse, role-tag, chunk, embed, and build the LanceDB index. Prints a build report."""
+    chunks, report = ingest_corpus(full=full)
+    n = build_index(chunks)
+    console.print(
+        f"[green]Indexed {n} chunks[/green] from {report['aip_files']} AIP + "
+        f"{report['vds_files']} VDS files."
+    )
+    dist = Counter(c.role.value for c in chunks)
+    console.print("roles: " + ", ".join(f"{k}={v}" for k, v in dist.most_common()))
+    if report["failed"]:
+        console.print(f"[yellow]{len(report['failed'])} file(s) failed to parse:[/yellow]")
+        for name, err in report["failed"][:25]:
+            console.print(f"  · {name}: {err}")
 
 
 @app.command()
