@@ -66,8 +66,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design (with rat
 ```bash
 uv sync                                   # create the venv and install deps
 
-# Build the index (first run downloads the embedder/reranker; full corpus ≈ a couple of hours on CPU)
-uv run aip-search ingest --full           # omit --full for the small dev slice
+# Build the index. The app runs fully offline (HF_HUB_OFFLINE=1 by default); the FIRST run
+# must download the embedder/reranker, so allow network for it just once:
+HF_HUB_OFFLINE=0 uv run aip-search ingest --full   # first time (downloads models, ≈ a couple of hours on CPU)
+uv run aip-search ingest --full                    # subsequent runs (offline; omit --full for the dev slice)
 
 # Query
 uv run aip-search query "Qual è la frequenza della torre di Crotone?"   # retrieval only

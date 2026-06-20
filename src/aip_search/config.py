@@ -1,7 +1,16 @@
-"""Paths and the small fixed file set used by the vertical slice."""
+"""Paths, models, and runtime config."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+# Local & offline by design: once the embedder/reranker are cached, never contact the
+# Hugging Face Hub. This removes the per-run "unauthenticated requests to the HF Hub" warning
+# and the latency of its update check. Set before any HF library is imported (config is
+# imported before the lazy sentence-transformers/fastembed imports). For the FIRST-time model
+# download, override with `HF_HUB_OFFLINE=0`.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 # Read-only corpus inputs.
 AIP_DIR = Path("/home/andrea/Documents/aip-downloader/downloads/2026-06-11_A06-26")
