@@ -1,0 +1,9 @@
+# Disable Streamlit's local-sources file watcher.
+#
+# The watcher enumerates every imported module's __path__ to decide what to hot-reload.
+# PyTorch's `torch.classes.__path__._path` getter raises a RuntimeError, so once a query
+# loads torch (sentence-transformers embedder/reranker) the watcher floods the console with
+# tracebacks on every cycle. The watcher only exists for dev auto-reload, which this app
+# doesn't need — turning it off removes the noise (restart manually after code edits).
+[server]
+fileWatcherType = "none"
