@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual env / uv
+.venv/
+
+# Local index + model caches (regenerable)
+data/
+.cache/
+
+# OS
+.DS_Store

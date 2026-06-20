@@ -1,0 +1,28 @@
+[project]
+name = "aip-search"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Sassy Lily", email = "212339561+sassy-lily@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastembed>=0.8.0",
+    "lancedb>=0.33.0",
+    "lxml>=6.1.1",
+    "ollama>=0.6.2",
+    "pandas>=3.0.3",
+    "pydantic>=2.13.4",
+    "pylance>=7.0.0",
+    "pymupdf>=1.27.2.3",
+    "rank-bm25>=0.2.2",
+    "typer>=0.25.1",
+]
+
+[project.scripts]
+aip-search = "aip_search:main"
+
+[build-system]
+requires = ["uv_build>=0.11.23,<0.12.0"]
+build-backend = "uv_build"
