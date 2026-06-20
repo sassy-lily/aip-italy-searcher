@@ -13,23 +13,28 @@ import statistics
 
 from aip_search.retrieve import Retriever
 
-# Labelled relative to the 3-file slice corpus (Crotone AD page, ENR 1.6, Legge 106/1985).
+# Labelled relative to the FULL corpus (entire Italian AIP + VDS legislation).
+# Negatives must be genuinely outside it: foreign airports (aviation-topical but absent
+# from the Italian AIP) or off-domain. Italian airports/airspace are all in-corpus.
 QUESTIONS: list[tuple[str, str]] = [
-    # Answerable
+    # Answerable (span the corpus: aerodrome data, ENR rules/airspace/warnings, legislation)
     ("Quale codice transponder si seleziona per un'emergenza?", "answerable"),
-    ("Quale codice transponder per avaria delle comunicazioni radio?", "answerable"),
     ("Cos'è il volo da diporto o sportivo?", "answerable"),
-    ("Quali sono le coordinate ARP dell'aeroporto di Crotone?", "answerable"),
     ("Quali sono i requisiti del transponder SSR nello spazio aereo italiano?", "answerable"),
-    ("Quali servizi di comunicazione ATS sono disponibili a Crotone?", "answerable"),
     ("Come avviene la distribuzione dei codici SSR Modo A in Italia?", "answerable"),
+    ("Quale codice transponder in VFR non in contatto con l'ATC?", "answerable"),
+    ("Qual è la frequenza TWR di LIRF?", "answerable"),
+    ("Quali servizi di comunicazione ATS sono disponibili a Crotone?", "answerable"),
+    ("Quali sono i limiti verticali della TMA di Milano?", "answerable"),
+    ("Dove si trovano le zone vietate o proibite al volo in Italia?", "answerable"),
     ("Quali sanzioni sono previste per il volo da diporto o sportivo?", "answerable"),
-    # Unanswerable (out-of-corpus aviation, or off-domain)
-    ("Qual è la frequenza della torre di Malpensa?", "unanswerable"),
-    ("Quali sono le procedure di avvicinamento strumentale per Fiumicino?", "unanswerable"),
+    # Unanswerable — foreign airports (aviation but not in the Italian AIP)
+    ("Qual è la frequenza della torre dell'aeroporto di Londra Heathrow?", "unanswerable"),
+    ("Quali sono le procedure di avvicinamento per l'aeroporto JFK di New York?", "unanswerable"),
+    ("Qual è l'elevazione dell'aeroporto di Parigi Charles de Gaulle?", "unanswerable"),
+    # Unanswerable — off-domain
     ("Come si prepara la pasta alla carbonara?", "unanswerable"),
     ("Qual è la capitale dell'Australia?", "unanswerable"),
-    ("Quanto costa un biglietto del treno per Napoli?", "unanswerable"),
     ("Chi ha vinto il campionato di calcio nel 1982?", "unanswerable"),
 ]
 

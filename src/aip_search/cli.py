@@ -19,12 +19,14 @@ from .synth import synthesize
 app = typer.Typer(add_completion=False, help="AIP-Search — local Italian AIP/VDS lookup (slice).")
 console = Console()
 
-# Abstention thresholds, calibrated for bge-reranker-v2-m3 on the slice corpus via
-# scripts/calibrate_thresholds.py (answerable scored 0.475–0.999, out-of-corpus
-# 0.001–0.420 — a clean gap at ~0.45). Re-run that script after any reranker or corpus
-# change; the score scale is model-specific (ARCHITECTURE.md §9).
-TAU_HIGH = 0.80  # ≥ → confident
-TAU_LOW = 0.45   # < → abstain; between → hedged
+# Abstention thresholds, calibrated for bge-reranker-v2-m3 on the FULL corpus via
+# scripts/calibrate_thresholds.py. Answerable scored 0.54–0.999; off-domain/clearly-absent
+# scored 0.002–0.15 (abstained). KNOWN GAP: a foreign-airport question phrased like an
+# in-corpus procedure ("approach procedures at JFK") scored 0.84 — the score gate cannot
+# separate that; it needs entity resolution / the gazetteer router (ARCHITECTURE.md §8).
+# Re-run the script after any reranker or corpus change; the scale is model-specific.
+TAU_HIGH = 0.90  # ≥ → confident
+TAU_LOW = 0.35   # < → abstain; between → hedged
 
 
 @app.command()

@@ -83,15 +83,24 @@ Findings:
   a leaner build would pin the PyTorch CPU index.
 
 ## Abstention threshold calibration (bge-reranker-v2-m3)
-`scripts/calibrate_thresholds.py` runs a 14-question labelled set (8 answerable, 6
-out-of-corpus) and reports top-reranker-score distributions. Result on the slice corpus:
-- Answerable: 0.475–0.999 (median 0.959); out-of-corpus: 0.001–0.420 (median 0.003).
-- **Clean gap at ~0.45** → set `TAU_LOW = 0.45` (abstain below), `TAU_HIGH = 0.80` (confident
-  above; hedge between). Correctly abstains all 6 unanswerable, keeps all 8 answerable.
-- Near-miss: "avvicinamento strumentale per Fiumicino" scored 0.420 (highest unanswerable —
-  topically aviation, matched AD 2.22) just below the gap; off-domain scored ~0.001.
-- The final tier ANDs reranker score × LLM status × guard flags, so "confident" requires
-  strong retrieval AND a committed, fully-verified answer — hedging is the safe default.
+`scripts/calibrate_thresholds.py` runs a labelled question set and reports top-reranker-score
+distributions. Two calibrations:
+
+**Slice (3 files):** answerable 0.475–0.999, out-of-corpus 0.001–0.420 — a **clean gap** at
+~0.45.
+
+**Full corpus (re-calibrated; negatives = foreign airports + off-domain):**
+- Answerable: 0.543–0.999 (median 0.962). Off-domain / clearly-absent: 0.002–0.152.
+- **OVERLAP**: "approach procedures at JFK" scored **0.838** — a false positive matching an
+  Italian airport's AD 2.22 procedures on topical similarity (JFK isn't a detected entity, so
+  no hard filter fired). No single threshold separates it from real answers.
+- **Key finding**: this empirically proves entity binding (not score thresholds) is the real
+  safety mechanism. The score gate catches off-domain/junk; foreign-airport-shaped queries
+  need the gazetteer router (block on unresolved-but-airport-shaped entity, §8) — a known gap.
+- Chosen: `TAU_LOW = 0.35` (abstains 5/6 negatives, false-abstains none of the 10 answerable),
+  `TAU_HIGH = 0.90` (the JFK false-positive lands in *hedged*, not confident).
+- The final tier ANDs reranker score × LLM status × guard flags — "confident" needs strong
+  retrieval AND a committed, fully-verified answer; hedging is the safe default.
 - Re-run the script after any reranker or corpus change; the score scale is model-specific.
 
 ## Full-corpus ingestion
@@ -114,11 +123,12 @@ Retrieval validated at scale:
 - `Retriever` loads 7,568 chunks + builds BM25 in ~0.5s.
 
 ## Not done (deliberately out of slice scope)
-- Docling table reconstruction; full router + gazetteer (entity detection is still an ICAO
-  regex + tiny alias stub — "Milano"/city names won't disambiguate yet); conflicting-sources
-  refinement (C); web UI; persistent-service latency; leaner CPU-only torch install.
-- Re-calibrate abstention thresholds on the full corpus (current values were derived on the
-  3-file slice).
+- **Full router + gazetteer** — entity detection is still an ICAO regex + tiny alias stub.
+  Two consequences proven during testing: "Milano"/city names won't disambiguate, and
+  *foreign*-airport queries ("JFK", "Heathrow") aren't recognized as unresolvable entities,
+  so they slip past the score gate. This is the highest-value remaining feature.
+- Docling table reconstruction; conflicting-sources refinement (C); web UI;
+  persistent-service latency; leaner CPU-only torch install.
 
 ## Run it
 ```bash
