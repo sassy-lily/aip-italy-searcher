@@ -67,10 +67,25 @@ Built `synth.py` (constrained-decoding JSON via Ollama `format=schema`, `think=F
 - iGPU generation ≈ 14 tok/s (memory-bandwidth-bound, ≈ CPU) but keeps the 16 CPU cores free
   for the embedder/reranker — useful non-contention rather than raw speed.
 
+## Production-model swap (BGE-M3 + bge-reranker-v2-m3)
+Added a `BACKEND` switch in config (`"torch"` = production via sentence-transformers,
+`"fastembed"` = ONNX substitutes). Default is now `torch`. Key implementation note: BGE-M3
+takes **no** query/passage prefixes (unlike e5 — the prefixes were dropped for the torch
+path). Re-ingested with BGE-M3 (dim 1024, same as e5, so the LanceDB schema is unchanged).
+Findings:
+- **Ranking improved**: both frequency tables (AD 2.19/2.18) now rank top with positive
+  scores; jina had buried them under AD 2.20.
+- **Score scale differs**: bge-reranker emits ~0–1 (sigmoid-like) vs jina's negative logits
+  → the placeholder abstention thresholds MUST be recalibrated per reranker (§9).
+- **Latency**: torch model loading dominates (~58s/query incl. cold loads vs ~10s ONNX) —
+  a persistent service is the real fix; per-CLI-invocation reloads are not representative.
+- torch install pulled CUDA-bundled wheels despite a CPU hint (unused on this AMD box);
+  a leaner build would pin the PyTorch CPU index.
+
 ## Not done (deliberately out of slice scope)
 - Docling table reconstruction; full router + gazetteer; empirical threshold calibration
-  (placeholders in CLI); conflicting-sources refinement (C); the production BGE-M3 /
-  bge-reranker-v2-m3 models; web UI; persistent-service latency.
+  (placeholders in CLI); conflicting-sources refinement (C); web UI; persistent-service
+  latency; leaner CPU-only torch install.
 
 ## Run it
 ```bash

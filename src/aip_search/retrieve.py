@@ -11,7 +11,7 @@ from functools import lru_cache
 
 from rank_bm25 import BM25Okapi
 
-from .config import RERANK_MODEL
+from .config import BACKEND, RERANK_MODEL
 from .index import embed_query, open_table
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:\.[a-z0-9]+)*")
@@ -74,9 +74,13 @@ class Result:
 
 @lru_cache(maxsize=1)
 def _reranker():
+    if BACKEND == "torch":
+        from sentence_transformers import CrossEncoder
+
+        return ("ce", CrossEncoder(RERANK_MODEL))  # BAAI/bge-reranker-v2-m3
     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-    return TextCrossEncoder(model_name=RERANK_MODEL)
+    return ("fe", TextCrossEncoder(model_name=RERANK_MODEL))
 
 
 class Retriever:
@@ -128,6 +132,10 @@ class Retriever:
 
         # ③ cross-encoder rerank
         texts = [self.by_id[cid]["text"] for cid in cand_ids]
-        rr = list(_reranker().rerank(query, texts))
+        kind, model = _reranker()
+        if kind == "ce":
+            rr = [float(s) for s in model.predict([(query, t) for t in texts])]
+        else:
+            rr = list(model.rerank(query, texts))
         ranked = sorted(zip(cand_ids, rr), key=lambda x: x[1], reverse=True)[:k]
         return [Result(text=self.by_id[cid]["text"], rerank_score=float(s), meta=self.by_id[cid]) for cid, s in ranked]

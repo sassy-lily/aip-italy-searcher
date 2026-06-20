@@ -20,10 +20,15 @@ SLICE_FILES = [
     VDS_DIR / "Legge ordinaria numero 106 del 25 marzo 1985 .xml",
 ]
 
-# fastembed (ONNX) models — multilingual, torch-free. Slice substitutes for the
-# locked BGE-M3 / bge-reranker-v2-m3 (which need torch); interfaces are identical.
-DENSE_MODEL = "intfloat/multilingual-e5-large"
-RERANK_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
+# Embedding/rerank backend:
+#   "torch"     → production locked models BGE-M3 + bge-reranker-v2-m3 (sentence-transformers)
+#   "fastembed" → ONNX substitutes multilingual-e5-large + jina-reranker-v2 (torch-free)
+BACKEND = "torch"
+
+_DENSE = {"torch": "BAAI/bge-m3", "fastembed": "intfloat/multilingual-e5-large"}
+_RERANK = {"torch": "BAAI/bge-reranker-v2-m3", "fastembed": "jinaai/jina-reranker-v2-base-multilingual"}
+DENSE_MODEL = _DENSE[BACKEND]
+RERANK_MODEL = _RERANK[BACKEND]
 
 # Generation LLM, served by Ollama (on the Radeon 860M iGPU via Vulkan).
 LLM_MODEL = "qwen3:4b"

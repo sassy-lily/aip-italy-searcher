@@ -8,7 +8,7 @@ from functools import lru_cache
 
 import lancedb
 
-from .config import DENSE_MODEL, LANCE_DIR
+from .config import BACKEND, DENSE_MODEL, LANCE_DIR
 from .models import Chunk
 
 TABLE = "chunks"
@@ -16,16 +16,25 @@ TABLE = "chunks"
 
 @lru_cache(maxsize=1)
 def _embedder():
+    if BACKEND == "torch":
+        from sentence_transformers import SentenceTransformer
+
+        return SentenceTransformer(DENSE_MODEL)  # BGE-M3 — no query/passage prefixes
     from fastembed import TextEmbedding
 
     return TextEmbedding(model_name=DENSE_MODEL)
 
 
 def embed_passages(texts: list[str]) -> list[list[float]]:
+    if BACKEND == "torch":
+        return _embedder().encode(texts, normalize_embeddings=True).tolist()
+    # e5 requires the "passage:" prefix.
     return [v.tolist() for v in _embedder().embed([f"passage: {t}" for t in texts])]
 
 
 def embed_query(query: str) -> list[float]:
+    if BACKEND == "torch":
+        return _embedder().encode([query], normalize_embeddings=True)[0].tolist()
     return next(iter(_embedder().embed([f"query: {query}"]))).tolist()
 
 
