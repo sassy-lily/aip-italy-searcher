@@ -82,6 +82,18 @@ Findings:
 - torch install pulled CUDA-bundled wheels despite a CPU hint (unused on this AMD box);
   a leaner build would pin the PyTorch CPU index.
 
+## Abstention threshold calibration (bge-reranker-v2-m3)
+`scripts/calibrate_thresholds.py` runs a 14-question labelled set (8 answerable, 6
+out-of-corpus) and reports top-reranker-score distributions. Result on the slice corpus:
+- Answerable: 0.475–0.999 (median 0.959); out-of-corpus: 0.001–0.420 (median 0.003).
+- **Clean gap at ~0.45** → set `TAU_LOW = 0.45` (abstain below), `TAU_HIGH = 0.80` (confident
+  above; hedge between). Correctly abstains all 6 unanswerable, keeps all 8 answerable.
+- Near-miss: "avvicinamento strumentale per Fiumicino" scored 0.420 (highest unanswerable —
+  topically aviation, matched AD 2.22) just below the gap; off-domain scored ~0.001.
+- The final tier ANDs reranker score × LLM status × guard flags, so "confident" requires
+  strong retrieval AND a committed, fully-verified answer — hedging is the safe default.
+- Re-run the script after any reranker or corpus change; the score scale is model-specific.
+
 ## Not done (deliberately out of slice scope)
 - Docling table reconstruction; full router + gazetteer; empirical threshold calibration
   (placeholders in CLI); conflicting-sources refinement (C); web UI; persistent-service

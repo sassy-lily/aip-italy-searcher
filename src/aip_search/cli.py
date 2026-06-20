@@ -17,10 +17,12 @@ from .synth import synthesize
 app = typer.Typer(add_completion=False, help="AIP-Search — local Italian AIP/VDS lookup (slice).")
 console = Console()
 
-# PLACEHOLDER thresholds on jina-reranker logits — to be calibrated empirically
-# on a real question set (ARCHITECTURE.md §9). Not production values.
-TAU_HIGH = 0.0
-TAU_LOW = -3.0
+# Abstention thresholds, calibrated for bge-reranker-v2-m3 on the slice corpus via
+# scripts/calibrate_thresholds.py (answerable scored 0.475–0.999, out-of-corpus
+# 0.001–0.420 — a clean gap at ~0.45). Re-run that script after any reranker or corpus
+# change; the score scale is model-specific (ARCHITECTURE.md §9).
+TAU_HIGH = 0.80  # ≥ → confident
+TAU_LOW = 0.45   # < → abstain; between → hedged
 
 
 @app.command()
