@@ -103,6 +103,15 @@ distributions. Two calibrations:
   retrieval AND a committed, fully-verified answer; hedging is the safe default.
 - Re-run the script after any reranker or corpus change; the score scale is model-specific.
 
+**Full corpus, router-aware (≥10/kind; current):** with the gazetteer router live, the 3
+foreign-airport negatives now ABSTAIN at routing (no longer score-gated) — the JFK overlap
+above is closed upstream, exactly as the "key finding" predicted. Re-derived on 12 answerable
++ 12 off-domain (search-routed): off-domain ≤0.20 (mostly ≤0.018), answerable ≥0.54. The
+existing **TAU_LOW=0.35 / TAU_HIGH=0.90 are validated** (unchanged). One answerable ("piste di
+Pisa") scored 0.163 against a GEN section instead of AD 2.12 — a semantic-vs-tabular retrieval
+miss that TAU_LOW correctly abstains (better than a confident wrong table; motivates Docling
+tables).
+
 ## Full-corpus ingestion
 `aip-search ingest --full` walks the whole corpus. Result:
 - **7,568 chunks from 907 AIP + 8 VDS files, 0 parse failures**, ~1h49m (CPU embedding with

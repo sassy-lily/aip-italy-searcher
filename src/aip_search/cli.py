@@ -21,11 +21,10 @@ app = typer.Typer(add_completion=False, help="AIP-Search — local Italian AIP/V
 console = Console()
 
 # Abstention thresholds, calibrated for bge-reranker-v2-m3 on the FULL corpus via
-# scripts/calibrate_thresholds.py. Answerable scored 0.54–0.999; off-domain/clearly-absent
-# scored 0.002–0.15 (abstained). KNOWN GAP: a foreign-airport question phrased like an
-# in-corpus procedure ("approach procedures at JFK") scored 0.84 — the score gate cannot
-# separate that; it needs entity resolution / the gazetteer router (ARCHITECTURE.md §8).
-# Re-run the script after any reranker or corpus change; the scale is model-specific.
+# scripts/calibrate_thresholds.py (router-aware, ≥10 questions/kind). Foreign-airport queries
+# are abstained by the router now; the SCORE GATE handles the rest — off-domain scored ≤0.20,
+# well-retrieved answers ≥0.54. Poorly-retrieved answerables fall below TAU_LOW and abstain,
+# which is correct. Re-run after any reranker or corpus change; the scale is model-specific.
 TAU_HIGH = 0.90  # ≥ → confident
 TAU_LOW = 0.35   # < → abstain; between → hedged
 
