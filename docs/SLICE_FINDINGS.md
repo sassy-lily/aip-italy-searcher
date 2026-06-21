@@ -66,6 +66,15 @@ Built `synth.py` (constrained-decoding JSON via Ollama `format=schema`, `think=F
   misfiles a citation ref into `verbatim_values` (guard strips it), and emits duplicate gaps.
 - iGPU generation ≈ 14 tok/s (memory-bandwidth-bound, ≈ CPU) but keeps the 16 CPU cores free
   for the embedder/reranker — useful non-contention rather than raw speed.
+- **Citations use INTEGER labels** ([1..N], mapped back to chunk-ids), not raw string ids.
+  Long ids were fragile: qwen3:8b copied the literal `id=` prefix → the guard rejected the
+  nonexistent id and dropped the whole answer. Integers are robust across models.
+- **Number guard is PRESENCE-only — a known limit.** It catches fabricated/derived numbers
+  but NOT a wrong-but-grounded one: for "VFR non in contatto con l'ATC" the 4B answered with a
+  code present in the cited chunk but wrong for the *condition* (it should be the 7000
+  conspicuity code). Both 4B and 8B erred (model size isn't the lever; **kept 4B**). The real
+  fix is retrieval/chunking that isolates the condition-specific value — same family as the
+  Docling-tables gap.
 
 ## Production-model swap (BGE-M3 + bge-reranker-v2-m3)
 Added a `BACKEND` switch in config (`"torch"` = production via sentence-transformers,
